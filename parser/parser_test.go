@@ -16,10 +16,10 @@ func TestParseJSONObject(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected JSONValue, got %T", parsed)
 	}
-	if obj["name"] != "John" {
+	if obj["name"] != types.JSONString("John") {
 		t.Errorf("Expected name to be John, got %v", obj["name"])
 	}
-	if obj["age"] != float64(30) {
+	if obj["age"] != types.JSONNumber(30) {
 		t.Errorf("Expected age to be 30, got %v", obj["age"])
 	}
 }
@@ -37,13 +37,13 @@ func TestParseJSONArray(t *testing.T) {
 	if len(arr) != 3 {
 		t.Errorf("Expected 3 elements, got %v", len(arr))
 	}
-	if arr[0] != float64(1) {
+	if arr[0] != types.JSONNumber(1) {
 		t.Errorf("Expected first element to be 1, got %v", arr[0])
 	}
-	if arr[1] != float64(2) {
+	if arr[1] != types.JSONNumber(2) {
 		t.Errorf("Expected second element to be 2, got %v", arr[1])
 	}
-	if arr[2] != float64(3) {
+	if arr[2] != types.JSONNumber(3) {
 		t.Errorf("Expected third element to be 3, got %v", arr[2])
 	}
 }
