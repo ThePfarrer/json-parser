@@ -6,6 +6,82 @@ import (
 	"json-parser/types"
 )
 
+func TestParseJSONBoolean(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected types.JSONBool
+		err      bool
+	}{
+		{"true", true, false},
+		{"false", false, false},
+		{"true,", true, false},
+		{"false,", false, false},
+		{"true}", true, false},
+		{"false}", false, false},
+	}
+
+	for _, test := range tests {
+		result, _, err := parseBool(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("parseBool(%q) error: %v, expected error: %v", test.input, err, test.err)
+		}
+		if !test.err && result != test.expected {
+			t.Errorf("parseBool(%q) = %v, want %v", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestParseJSONNumber(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected types.JSONNumber
+		err      bool
+	}{
+		{"0", 0, false},
+		{"123", 123, false},
+		{"-456", -456, false},
+		{"3.14", 3.14, false},
+		{"1.23e4", 12300, false},
+		{"invalid", 0, true},
+	}
+
+	for _, test := range tests {
+		result, _, err := parseNumber(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("parseNumber(%q) error: %v, expected error: %v", test.input, err, test.err)
+		}
+		if !test.err && result != test.expected {
+			t.Errorf("parseNumber(%q) = %v, want %v", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestParseString(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected types.JSONString
+		err      bool
+	}{
+		{`""`, "", false},
+		{`"hello"`, "hello", false},
+		{`"hello\nworld"`, "hello\nworld", false},
+		{`"\""`, "\"", false},
+		{`"\u0020"`, " ", false},
+		{`"\u0041"`, "A", false},
+		{`"invalid`, "", true}, 
+	}
+
+	for _, test := range tests {
+		result, _, err := parseString(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("parseString(%q) error: %v, expected error: %v", test.input, err, test.err)
+		}
+		if !test.err && result != test.expected {
+			t.Errorf("parseString(%q) = %q, want %q", test.input, result, test.expected)
+		}
+	}
+}
+
 func TestParseJSONObject(t *testing.T) {
 	json := `{"name": "John", "age": 30}`
 	parsed, err := ParseJSON(json)

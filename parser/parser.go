@@ -2,7 +2,9 @@ package parser
 
 import (
 	"errors"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"json-parser/types"
 )
@@ -47,24 +49,40 @@ func parseValue(input string) (types.JSONValue, string, error) {
 	}
 }
 
-func parseNumber(input string) (types.JSONValue, string, error) {
-	panic("unimplemented")
+func parseNumber(input string) (types.JSONNumber, string, error) {
+	end := 0
+	for end < len(input) && isNumberChar(input[end]) {
+		end++
+	}
+	if end == 0 {
+		return 0, input, errors.New("invalid number")
+	}
+	numStr := input[:end]
+	num, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0, input, err
+	}
+	return types.JSONNumber(num), input[end:], nil
 }
 
-func parseNull(input string) (types.JSONValue, string, error) {
+func isNumberChar(b byte) bool {
+	return unicode.IsDigit(rune(b)) || b == '.' || b == '-' || b == 'e' || b == 'E' || b == '+'
+}
+
+func parseNull(input string) (types.JSONNull, string, error) {
 	if strings.HasPrefix(input, "null") {
 		return types.JSONNull{}, input[4:], nil
 	}
-	return nil, input, errors.New("invalid null")
+	return types.JSONNull{}, input, errors.New("invalid null")
 }
 
-func parseBool(input string) (types.JSONValue, string, error) {
+func parseBool(input string) (types.JSONBool, string, error) {
 	if strings.HasPrefix(input, "true") {
 		return types.JSONBool(true), input[4:], nil
 	} else if strings.HasPrefix(input, "false") {
 		return types.JSONBool(false), input[5:], nil
 	}
-	return nil, input, errors.New("invalid boolean")
+	return types.JSONBool(false), input, errors.New("invalid boolean")
 }
 
 func parseString(input string) (types.JSONString, string, error) {
@@ -82,8 +100,58 @@ func parseString(input string) (types.JSONString, string, error) {
 		return "", input, errors.New("unterminated string")
 	}
 	raw := input[1:end]
-	unescaped := raw
+	unescaped := unescapeString(raw)
 	return types.JSONString(unescaped), input[end+1:], nil
+}
+
+func unescapeString(raw string) string {
+	var result strings.Builder
+	for i := 0; i < len(raw); i++ {
+		if raw[i] == '\\' {
+			i++
+			if i < len(raw) {
+				switch raw[i] {
+				case '"':
+					result.WriteByte('"')
+				case '\\':
+					result.WriteByte('\\')
+				case '/':
+					result.WriteByte('/')
+				case 'b':
+					result.WriteByte('\b')
+				case 'f':
+					result.WriteByte('\f')
+				case 'n':
+					result.WriteByte('\n')
+				case 'r':
+					result.WriteByte('\r')
+				case 't':
+					result.WriteByte('\t')
+				case 'u':
+					if i+4 < len(raw) {
+						hex := raw[i+1 : i+5]
+						codePoint, err := strconv.ParseUint(hex, 16, 32)
+						if err == nil {
+							result.WriteRune(rune(codePoint))
+							i += 4
+						} else {
+							// Invalid Unicode escape sequence, ignore it
+							result.WriteString("\\u" + hex)
+							i += 4
+						}
+					} else {
+						// Incomplete Unicode escape sequence, ignore it
+						result.WriteString("\\u")
+					}
+				default:
+					result.WriteByte(raw[i])
+				}
+			}
+		} else {
+			result.WriteByte(raw[i])
+		}
+	}
+	return result.String()
 }
 
 func parseArray(input string) (types.JSONArray, string, error) {
