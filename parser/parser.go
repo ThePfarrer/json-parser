@@ -54,6 +54,9 @@ func parseValue(input string) (types.JSONValue, string, error) {
 }
 
 func parseNumber(input string) (types.JSONNumber, string, error) {
+	if len(input) > 1 && input[0] == '0' && unicode.IsDigit(rune(input[1])) {
+		return 0, input, errors.New("numbers cannot have leading zeroes")
+	}
 	end := 0
 	for end < len(input) && isNumberChar(input[end]) {
 		end++
