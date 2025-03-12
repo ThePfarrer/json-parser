@@ -2,33 +2,29 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"json-parser/parser"
-	"json-parser/types"
 )
 
 func main() {
-	json := `{"name": "John", "age": 30}`
-	parsed, err := parser.ParseJSON(json)
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: json-parser <file>")
+		return
+	}
+
+	filePath := os.Args[1]
+	json, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Println("Error reading file", err)
+		return
+	}
+
+	parsed, err := parser.ParseJSON(string(json))
 	if err != nil {
 		fmt.Println("Error parsing JSON", err)
 		return
 	}
 
-	switch v := parsed.(type) {
-	case types.JSONObject:
-		fmt.Println("Parsed JSON object:", v)
-	case types.JSONArray:
-		fmt.Println("Parsed JSON array:", v)
-	case types.JSONString:
-		fmt.Println("Parsed JSON string:", v)
-	case types.JSONNumber:
-		fmt.Println("Parsed JSON number:", v)
-	case types.JSONBool:
-		fmt.Println("Parsed JSON boolean:", v)
-	case types.JSONNull:
-		fmt.Println("Parsed JSON null:", v)
-	default:
-		fmt.Println("Parsed JSONv value:", v)
-	}
+	fmt.Println("Parsed JSON object:", parsed)
 }
