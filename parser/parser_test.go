@@ -1,12 +1,13 @@
 package parser
 
 import (
+	"reflect"
 	"testing"
 
 	"json-parser/types"
 )
 
-func TestParseJSONBoolean(t *testing.T) {
+func TestParseJSONBool(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected types.JSONBool
@@ -68,7 +69,7 @@ func TestParseString(t *testing.T) {
 		{`"\""`, "\"", false},
 		{`"\u0020"`, " ", false},
 		{`"\u0041"`, "A", false},
-		{`"invalid`, "", true}, 
+		{`"invalid`, "", true},
 	}
 
 	for _, test := range tests {
@@ -82,44 +83,170 @@ func TestParseString(t *testing.T) {
 	}
 }
 
-func TestParseJSONObject(t *testing.T) {
-	json := `{"name": "John", "age": 30}`
-	parsed, err := ParseJSON(json)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+func TestParseJSON(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected types.JSONValue
+		err      bool
+	}{
+		{`{"name": "John", "age": 30}`, types.JSONObject{"name": types.JSONString("John"), "age": types.JSONNumber(30)}, false},
+		{`[1, 2, 3]`, types.JSONArray{types.JSONNumber(1), types.JSONNumber(2), types.JSONNumber(3)}, false},
+		{`"hello"`, types.JSONString("hello"), false},
+		{`123`, types.JSONNumber(123), false},
+		{`true`, types.JSONBool(true), false},
+		{`false`, types.JSONBool(false), false},
+		{`null`, types.JSONNull{}, false},
+		{``, nil, true},
+		{`invalid`, nil, true},
+		{`{"name": "John", "age": 30`, nil, true},
+		{`[1, 2, 3`, nil, true},
 	}
-	obj, ok := parsed.(types.JSONObject)
-	if !ok {
-		t.Fatalf("Expected JSONValue, got %T", parsed)
+
+	for _, test := range tests {
+		result, err := ParseJSON(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("ParseJSON(%q) error: %v, expected error: %v", test.input, err, test.err)
+		}
+		if !test.err && !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("ParseJSON(%q) = %v, want %v", test.input, result, test.expected)
+		}
 	}
-	if obj["name"] != types.JSONString("John") {
-		t.Errorf("Expected name to be John, got %v", obj["name"])
+}
+func TestIsNumberChar(t *testing.T) {
+	tests := []struct {
+		input    byte
+		expected bool
+	}{
+		{'0', true},
+		{'9', true},
+		{'.', true},
+		{'-', true},
+		{'e', true},
+		{'E', true},
+		{'+', true},
+		{'a', false},
+		{'Z', false},
+		{' ', false},
+		{'$', false},
 	}
-	if obj["age"] != types.JSONNumber(30) {
-		t.Errorf("Expected age to be 30, got %v", obj["age"])
+
+	for _, test := range tests {
+		result := isNumberChar(test.input)
+		if result != test.expected {
+			t.Errorf("isNumberChar(%q) = %v, want %v", test.input, result, test.expected)
+		}
+	}
+}
+func TestParseNull(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected types.JSONNull
+		err      bool
+	}{
+		{"null", types.JSONNull{}, false},
+		{"null,", types.JSONNull{}, false},
+		{"null}", types.JSONNull{}, false},
+		{"nul", types.JSONNull{}, true},
+		{"invalid", types.JSONNull{}, true},
+	}
+
+	for _, test := range tests {
+		result, _, err := parseNull(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("parseNull(%q) error: %v, expected error: %v", test.input, err, test.err)
+		}
+		if !test.err && result != test.expected {
+			t.Errorf("parseNull(%q) = %v, want %v", test.input, result, test.expected)
+		}
+	}
+}
+func TestUnescapeString(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`hello`, "hello"},
+		{`hello\nworld`, "hello\nworld"},
+		{`hello\\world`, "hello\\world"},
+		{`hello\"world`, "hello\"world"},
+		{`hello\/world`, "hello/world"},
+		{`hello\bworld`, "hello\bworld"},
+		{`hello\fworld`, "hello\fworld"},
+		{`hello\rworld`, "hello\rworld"},
+		{`hello\tworld`, "hello\tworld"},
+		{`hello\u0020world`, "hello world"},
+		{`hello\u0041world`, "helloAworld"},
+		{`hello\u`, "hello\\u"},
+		{`hello\u123`, "hello\\u123"},
+	}
+
+	for _, test := range tests {
+		result := unescapeString(test.input)
+		if result != test.expected {
+			t.Errorf("unescapeString(%q) = %q, want %q", test.input, result, test.expected)
+		}
+	}
+}
+func TestParseArray(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected types.JSONArray
+		err      bool
+	}{
+		{`[]`, types.JSONArray{}, false},
+		{`[1, 2, 3]`, types.JSONArray{types.JSONNumber(1), types.JSONNumber(2), types.JSONNumber(3)}, false},
+		{`["a", "b", "c"]`, types.JSONArray{types.JSONString("a"), types.JSONString("b"), types.JSONString("c")}, false},
+		{`[true, false, null]`, types.JSONArray{types.JSONBool(true), types.JSONBool(false), types.JSONNull{}}, false},
+		{`[1, "a", true, null]`, types.JSONArray{types.JSONNumber(1), types.JSONString("a"), types.JSONBool(true), types.JSONNull{}}, false},
+		{`[1, 2, 3`, nil, true},
+		{`[1, 2, 3,]`, nil, true},
+		{`[1, "a", true, null,]`, nil, true},
+		{`[`, nil, true},
+		{`invalid`, nil, true},
+	}
+
+	for _, test := range tests {
+		result, _, err := parseArray(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("parseArray(%q) error: %v, expected error: %v", test.input, err, test.err)
+		}
+		if !test.err && !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("parseArray(%q) = %v, want %v", test.input, result, test.expected)
+		}
+	}
+}
+func TestParseObject(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected types.JSONObject
+		err      bool
+	}{
+		{`{}`, types.JSONObject{}, false},
+		{`{"name": "John"}`, types.JSONObject{"name": types.JSONString("John")}, false},
+		{`{"age": 30}`, types.JSONObject{"age": types.JSONNumber(30)}, false},
+		{`{"name": "John", "age": 30}`, types.JSONObject{"name": types.JSONString("John"), "age": types.JSONNumber(30)}, false},
+		{`{"name": "John", "age": 30, "isStudent": true}`, types.JSONObject{"name": types.JSONString("John"), "age": types.JSONNumber(30), "isStudent": types.JSONBool(true)}, false},
+		{`{"name": "John", "address": {"city": "New York", "zip": "10001"}}`, types.JSONObject{"name": types.JSONString("John"), "address": types.JSONObject{"city": types.JSONString("New York"), "zip": types.JSONString("10001")}}, false},
+		{`{"name": "John", "hobbies": ["reading", "swimming"]}`, types.JSONObject{"name": types.JSONString("John"), "hobbies": types.JSONArray{types.JSONString("reading"), types.JSONString("swimming")}}, false},
+		{`{"name": "John", "age": 30`, nil, true},
+		{`{"name": "John", "age": 30,}`, nil, true},
+		{`{"name": "John", "age": 30, "isStudent": true,}`, nil, true},
+		{`{`, nil, true},
+		{`invalid`, nil, true},
+	}
+
+	for _, test := range tests {
+		result, _, err := parseObject(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("parseObject(%q) error: %v, expected error: %v", test.input, err, test.err)
+		}
+		if !test.err && !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("parseObject(%q) = %v, want %v", test.input, result, test.expected)
+		}
 	}
 }
 
-func TestParseJSONArray(t *testing.T) {
-	json := `[1, 2, 3]`
-	parsed, err := ParseJSON(json)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	arr, ok := parsed.(types.JSONArray)
-	if !ok {
-		t.Fatalf("Expected JSONArray, got %T", parsed)
-	}
-	if len(arr) != 3 {
-		t.Errorf("Expected 3 elements, got %v", len(arr))
-	}
-	if arr[0] != types.JSONNumber(1) {
-		t.Errorf("Expected first element to be 1, got %v", arr[0])
-	}
-	if arr[1] != types.JSONNumber(2) {
-		t.Errorf("Expected second element to be 2, got %v", arr[1])
-	}
-	if arr[2] != types.JSONNumber(3) {
-		t.Errorf("Expected third element to be 3, got %v", arr[2])
-	}
-}
+
+
+
+

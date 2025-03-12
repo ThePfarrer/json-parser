@@ -184,6 +184,13 @@ func parseArray(input string) (types.JSONArray, string, error) {
 			return nil, input, errors.New("expected ',' or ']'")
 		}
 		input = input[1:]
+		input = strings.TrimSpace(input)
+        if len(input) == 0 {
+            return nil, input, errors.New("unexpected end of input")
+        }
+        if input[0] == ']' {
+            return nil, input, errors.New("trailing comma in array")
+        }
 	}
 }
 
@@ -227,5 +234,12 @@ func parseObject(input string) (types.JSONObject, string, error) {
 			return nil, input, errors.New("expected ',' or '}'")
 		}
 		input = input[1:]
+		input = strings.TrimSpace(input)
+        if len(input) == 0 {
+            return nil, input, errors.New("unexpected end of input")
+        }
+        if input[0] == '}' {
+            return nil, input, errors.New("trailing comma in array")
+        }
 	}
 }
