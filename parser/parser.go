@@ -107,11 +107,14 @@ func parseString(input string) (types.JSONString, string, error) {
 		return "", input, errors.New("unterminated string")
 	}
 	raw := input[1:end]
-	unescaped := unescapeString(raw)
+	unescaped, err := unescapeString(raw)
+	if err != nil {
+		return "", input, err
+	}
 	return types.JSONString(unescaped), input[end+1:], nil
 }
 
-func unescapeString(raw string) string {
+func unescapeString(raw string) (string, error) {
 	var result strings.Builder
 	for i := 0; i < len(raw); i++ {
 		if raw[i] == '\\' {
@@ -142,23 +145,20 @@ func unescapeString(raw string) string {
 							result.WriteRune(rune(codePoint))
 							i += 4
 						} else {
-							// Invalid Unicode escape sequence, ignore it
-							result.WriteString("\\u" + hex)
-							i += 4
+							return "", errors.New("invalid escape sequence")
 						}
 					} else {
-						// Incomplete Unicode escape sequence, ignore it
-						result.WriteString("\\u")
+						return "", errors.New("invalid escape sequence")
 					}
 				default:
-					result.WriteByte(raw[i])
+					return "", errors.New("invalid escape sequence")
 				}
 			}
 		} else {
 			result.WriteByte(raw[i])
 		}
 	}
-	return result.String()
+	return result.String(), nil
 }
 
 func parseArray(input string) (types.JSONArray, string, error) {
@@ -192,12 +192,12 @@ func parseArray(input string) (types.JSONArray, string, error) {
 		}
 		input = input[1:]
 		input = strings.TrimSpace(input)
-        if len(input) == 0 {
-            return nil, input, errors.New("unexpected end of input")
-        }
-        if input[0] == ']' {
-            return nil, input, errors.New("trailing comma in array")
-        }
+		if len(input) == 0 {
+			return nil, input, errors.New("unexpected end of input")
+		}
+		if input[0] == ']' {
+			return nil, input, errors.New("trailing comma in array")
+		}
 	}
 }
 
@@ -242,11 +242,11 @@ func parseObject(input string) (types.JSONObject, string, error) {
 		}
 		input = input[1:]
 		input = strings.TrimSpace(input)
-        if len(input) == 0 {
-            return nil, input, errors.New("unexpected end of input")
-        }
-        if input[0] == '}' {
-            return nil, input, errors.New("trailing comma in array")
-        }
+		if len(input) == 0 {
+			return nil, input, errors.New("unexpected end of input")
+		}
+		if input[0] == '}' {
+			return nil, input, errors.New("trailing comma in array")
+		}
 	}
 }

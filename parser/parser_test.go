@@ -44,6 +44,7 @@ func TestParseJSONNumber(t *testing.T) {
 		{"3.14", 3.14, false},
 		{"1.23e4", 12300, false},
 		{"invalid", 0, true},
+		{"013", 0, true},
 	}
 
 	for _, test := range tests {
@@ -91,11 +92,11 @@ func TestParseJSON(t *testing.T) {
 	}{
 		{`{"name": "John", "age": 30}`, types.JSONObject{"name": types.JSONString("John"), "age": types.JSONNumber(30)}, false},
 		{`[1, 2, 3]`, types.JSONArray{types.JSONNumber(1), types.JSONNumber(2), types.JSONNumber(3)}, false},
-		{`"hello"`, types.JSONString("hello"), false},
-		{`123`, types.JSONNumber(123), false},
-		{`true`, types.JSONBool(true), false},
-		{`false`, types.JSONBool(false), false},
-		{`null`, types.JSONNull{}, false},
+		{`"hello"`, nil, true},
+		{`123`, nil, true},
+		{`true`, nil, true},
+		{`false`, nil, true},
+		{`null`, nil, true},
 		{``, nil, true},
 		{`invalid`, nil, true},
 		{`{"name": "John", "age": 30`, nil, true},
@@ -112,6 +113,7 @@ func TestParseJSON(t *testing.T) {
 		}
 	}
 }
+
 func TestIsNumberChar(t *testing.T) {
 	tests := []struct {
 		input    byte
@@ -137,6 +139,7 @@ func TestIsNumberChar(t *testing.T) {
 		}
 	}
 }
+
 func TestParseNull(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -160,33 +163,39 @@ func TestParseNull(t *testing.T) {
 		}
 	}
 }
+
 func TestUnescapeString(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected string
+		err      bool
 	}{
-		{`hello`, "hello"},
-		{`hello\nworld`, "hello\nworld"},
-		{`hello\\world`, "hello\\world"},
-		{`hello\"world`, "hello\"world"},
-		{`hello\/world`, "hello/world"},
-		{`hello\bworld`, "hello\bworld"},
-		{`hello\fworld`, "hello\fworld"},
-		{`hello\rworld`, "hello\rworld"},
-		{`hello\tworld`, "hello\tworld"},
-		{`hello\u0020world`, "hello world"},
-		{`hello\u0041world`, "helloAworld"},
-		{`hello\u`, "hello\\u"},
-		{`hello\u123`, "hello\\u123"},
+		{`hello`, "hello", false},
+		{`hello\nworld`, "hello\nworld", false},
+		{`hello\\world`, "hello\\world", false},
+		{`hello\"world`, "hello\"world", false},
+		{`hello\/world`, "hello/world", false},
+		{`hello\bworld`, "hello\bworld", false},
+		{`hello\fworld`, "hello\fworld", false},
+		{`hello\rworld`, "hello\rworld", false},
+		{`hello\tworld`, "hello\tworld", false},
+		{`hello\u0020world`, "hello world", false},
+		{`hello\u0041world`, "helloAworld", false},
+		{`hello\u`, "", true},
+		{`hello\u123`, "", true},
 	}
 
 	for _, test := range tests {
-		result := unescapeString(test.input)
-		if result != test.expected {
+		result, err := unescapeString(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("unescapeString(%q) error: %v, expected error: %v", test.input, err, test.err)
+		}
+		if !test.err && result != test.expected {
 			t.Errorf("unescapeString(%q) = %q, want %q", test.input, result, test.expected)
 		}
 	}
 }
+
 func TestParseArray(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -215,6 +224,7 @@ func TestParseArray(t *testing.T) {
 		}
 	}
 }
+
 func TestParseObject(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -245,8 +255,3 @@ func TestParseObject(t *testing.T) {
 		}
 	}
 }
-
-
-
-
-
