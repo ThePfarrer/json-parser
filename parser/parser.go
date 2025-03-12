@@ -15,6 +15,10 @@ func ParseJSON(input string) (types.JSONValue, error) {
 		return nil, errors.New("empty input")
 	}
 
+	if input[0] != '[' && input[0] != '{' {
+		return nil, errors.New("JSON must start with '[' or '{'")
+	}
+
 	value, rest, err := parseValue(input)
 	if err != nil {
 		return nil, err
